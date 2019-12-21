@@ -20,20 +20,9 @@ This implementation works with the following passes:
   3. Execute single-stop effects into big-step effects.
   4. Optional: Evaluate the effect as a function from a list of inputs to list of outputs
 
->>> intCodeToList [3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9] <$> [[0],[10]]
-[[0],[1]]
-
->>> intCodeToList [3,3,1105,-1,9,1101,0,0,12,4,12,99,1] <$> [[0],[10]]
-[[0],[1]]
-
->>> :{
->>> intCodeToList
->>>   [3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
->>>    1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
->>>    999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99]
->>> <$> [[7],[8],[9]]
->>> :}
-[[999],[1000],[1001]]
+Common use mode
+* List functions: 'intCodeToList'
+* Effect interpretation: 'new', 'run', 'Effect'
 
 -}
 module Intcode
@@ -58,10 +47,10 @@ module Intcode
   IntcodeFault(..)
   ) where
 
-import           Control.Exception (Exception, throwIO, throw)
-import           Data.Char        (chr, ord)
-import           Data.IntMap      (IntMap)
-import           Data.Traversable (mapAccumL)
+import           Control.Exception (Exception(..), throwIO, throw)
+import           Data.Char         (chr, ord)
+import           Data.IntMap       (IntMap)
+import           Data.Traversable  (mapAccumL)
 import qualified Data.IntMap as IntMap
 import qualified Data.Primitive.PrimArray as P
 import           Text.Show.Functions ()
@@ -71,11 +60,14 @@ import           Text.Show.Functions ()
 ------------------------------------------------------------------------
 
 -- | Run intcode program using stdio.
+--
+-- >>> runIO (run (new [104,72,104,101,104,108,104,108,104,111,104,33,104,10,99]))
+-- Hello!
 runIO :: Effect -> IO ()
 runIO (Output o e)
   | 0 <= o, o < 0x80  = putChar (chr (fromIntegral o))    >> runIO e
   | otherwise         = putStrLn ("<<" ++ show o ++ ">>") >> runIO e
-runIO (Input f)       = getChar >>= runIO . f . fromIntegral . ord
+runIO (Input f)       = runIO . f . fromIntegral . ord =<< getChar
 runIO Halt            = return ()
 runIO Fault           = throwIO IntcodeFault
 
@@ -84,6 +76,26 @@ runIO Fault           = throwIO IntcodeFault
 ------------------------------------------------------------------------
 
 -- | Run a given memory image as a list transducer.
+--
+-- Use 'effectList' when you want to provide a specific 'Effect'.
+--
+-- Throws: 'IntcodeFault' when machine faults or too few inputs are provided.
+--
+--
+-- >>> intCodeToList [3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9] <$> [[0],[10]]
+-- [[0],[1]]
+--
+-- >>> intCodeToList [3,3,1105,-1,9,1101,0,0,12,4,12,99,1] <$> [[0],[10]]
+-- [[0],[1]]
+--
+-- >>> :{
+-- >>> intCodeToList
+-- >>>   [3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+-- >>>    1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+-- >>>    999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99]
+-- >>> <$> [[7],[8],[9]]
+-- >>> :}
+-- [[999],[1000],[1001]]
 intCodeToList ::
   [Int] {- ^ initial memory -} ->
   [Int] {- ^ inputs         -} ->
@@ -92,6 +104,8 @@ intCodeToList = effectList . run . new
 
 -- | Evaluate a program's effect as a function from a list of
 -- inputs to a list of outputs.
+--
+-- Throws: 'IntcodeFault' when machine faults or too few inputs are provided.
 effectList ::
   Effect {- ^ program effect -} ->
   [Int]  {- ^ inputs         -} ->
@@ -108,11 +122,11 @@ effectList effect inputs =
 -- Machine state
 ------------------------------------------------------------------------
 
--- | Machine state
+-- | Machine state.
 data Machine = Machine
-  { pc      :: !Int                           -- ^ program counter
-  , relBase :: !Int                           -- ^ relative base pointer
-  , memory  :: !(IntMap Int)                  -- ^ memory updates
+  { pc      :: !Int          -- ^ program counter
+  , relBase :: !Int          -- ^ relative base pointer
+  , memory  :: !(IntMap Int) -- ^ memory updates
   , image   :: {-# Unpack #-} !(P.PrimArray Int) -- ^ initial memory
   }
   deriving (Eq, Ord, Show)
@@ -127,7 +141,7 @@ indexImage m i
     a = image m
 {-# INLINE indexImage #-}
 
--- | Memory lookup from 0-based index
+-- | Memory lookup from 0-based index.
 (!) ::
   Machine {- ^ machine  -} ->
   Int     {- ^ position -} ->
@@ -170,6 +184,9 @@ jmp i mach = mach { pc = i }
 -- | Generate a list representation of memory starting from
 -- zero. This can get big for sparsely filled memory using
 -- large addresses. Returned values start at position 0.
+--
+-- >>> memoryList (set 8 10 (new [1,2,3]))
+-- [1,2,3,0,0,0,0,0,10]
 memoryList :: Machine -> [Int]
 memoryList mach
   | IntMap.null (memory mach) = P.primArrayToList (image mach)
@@ -191,6 +208,12 @@ data Effect
   deriving Show
 
 -- | Big-step semantics of virtual machine.
+--
+-- >>> run (new [1102,34915192,34915192,7,4,7,99,0])
+-- Output 1219070632396864 Halt
+--
+-- >>> run (new [3,1,99])
+-- Input <function>
 run :: Machine -> Effect
 run mach =
   case step mach of
@@ -203,6 +226,11 @@ run mach =
 -- | Compose two effects together. Outputs from first argument are
 -- used as inputs to the second effect. Composed effect halts when
 -- the second machine halts.
+--
+-- >>> let mult n = Input (\i -> Output (i*n) Halt)
+-- >>> let add  n = Input (\i -> Output (i+n) Halt)
+-- >>> effectList (mult 3 >>> add 1) [4]
+-- [13]
 (>>>) :: Effect -> Effect -> Effect
 x          >>> Output o y = Output o (x >>> y)
 _          >>> Halt       = Halt
@@ -215,6 +243,9 @@ Input f    >>> y          = Input (\i -> f i >>> y)
 infixl 9 >>>
 
 -- | Run first effect until it halts, then run the second effect.
+--
+-- >>> Output 1 Halt `followedBy` Output 2 Halt
+-- Output 1 (Output 2 Halt)
 followedBy :: Effect -> Effect -> Effect
 followedBy Halt         y = y
 followedBy Fault        _ = Fault
@@ -224,7 +255,11 @@ followedBy (Input  f  ) y = Input (\i -> followedBy (f i) y)
 -- | Provide an input to the first occurence of an input request
 -- in a program effect. It is considered a fault if a program
 -- terminates before using the input.
-feedInput :: [Int] -> Effect -> Effect
+--
+-- >>> let mult n = Input (\i -> Output (i*n) Halt)
+-- >>> feedInput [6] (mult 5)
+-- Output 30 Halt
+feedInput :: [Int] {- ^ inputs -} -> Effect -> Effect
 feedInput []     e            = e
 feedInput xs     (Output o e) = Output o (feedInput xs e)
 feedInput (x:xs) (Input f)    = feedInput xs (f x)
@@ -370,4 +405,5 @@ digit i x = x `quot` (10^i) `rem` 10
 data IntcodeFault = IntcodeFault
   deriving (Eq, Ord, Show, Read)
 
-instance Exception IntcodeFault
+instance Exception IntcodeFault where
+  displayException _ = "intcode machine fault"
