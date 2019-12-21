@@ -1,4 +1,4 @@
-{-# Language DeriveTraversable #-}
+{-# Language DeriveTraversable, Trustworthy #-}
 {-|
 Module      : Intcode
 Description : Intcode interpreter
@@ -135,9 +135,8 @@ data Machine = Machine
 -- | Value stored in initial memory image at given index.
 indexImage :: Machine -> Int -> Int
 indexImage m i
-  | a `seq` False                   = undefined
-  | 0 <= i, i < P.sizeofPrimArray a = P.indexPrimArray a i
-  | otherwise                       = 0
+  | a `seq` True, 0 <= i, i < P.sizeofPrimArray a = P.indexPrimArray a i
+  | otherwise                                     = 0
   where
     a = image m
 {-# INLINE indexImage #-}
