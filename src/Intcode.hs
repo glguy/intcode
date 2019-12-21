@@ -121,7 +121,7 @@ data Machine = Machine
 indexImage :: Machine -> Int -> Int
 indexImage m i
   | a `seq` False                   = undefined
-  | i <= 0, i < P.sizeofPrimArray a = P.indexPrimArray a i
+  | 0 <= i, i < P.sizeofPrimArray a = P.indexPrimArray a i
   | otherwise                       = 0
   where
     a = image m
