@@ -10,6 +10,8 @@ author:              Eric Mertens
 maintainer:          emertens@gmail.com
 copyright:           2019 Eric Mertens
 build-type:          Simple
+homepage:            https://github.com/glguy/intcode
+bug-reports:         https://github.com/glguy/intcode/issues
 tested-with:         GHC ==8.6.5, GHC ==8.8.1
 
 description:
@@ -23,6 +25,10 @@ description:
 extra-source-files:
   CHANGELOG.md
   README.md
+
+source-repository head
+  type:              git
+  location:          https://github.com/glguy/intcode
 
 library
   hs-source-dirs:    src
