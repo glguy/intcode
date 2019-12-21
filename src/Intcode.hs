@@ -20,7 +20,8 @@ This implementation works with the following passes:
   3. Execute single-stop effects into big-step effects.
   4. Optional: Evaluate the effect as a function from a list of inputs to list of outputs
 
-Common use mode
+Common use modes:
+
 * List functions: 'intCodeToList'
 * Effect interpretation: 'new', 'run', 'Effect'
 
