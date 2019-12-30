@@ -22,14 +22,14 @@ This implementation works with the following passes:
 
 Common use modes:
 
-* List functions: 'intCodeToList'
+* List functions: 'intcodeToList'
 * Effect interpretation: 'new', 'run', 'Effect'
 
 -}
 module Intcode
   (
   -- * Simple interface
-  intCodeToList,
+  intcodeToList,
   runIO,
 
   -- * Machine state
@@ -83,25 +83,25 @@ runIO Fault           = throwIO IntcodeFault
 -- Throws: 'IntcodeFault' when machine faults or too few inputs are provided.
 --
 --
--- >>> intCodeToList [3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9] <$> [[0],[10]]
+-- >>> intcodeToList [3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9] <$> [[0],[10]]
 -- [[0],[1]]
 --
--- >>> intCodeToList [3,3,1105,-1,9,1101,0,0,12,4,12,99,1] <$> [[0],[10]]
+-- >>> intcodeToList [3,3,1105,-1,9,1101,0,0,12,4,12,99,1] <$> [[0],[10]]
 -- [[0],[1]]
 --
 -- >>> :{
--- >>> intCodeToList
+-- >>> intcodeToList
 -- >>>   [3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
 -- >>>    1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
 -- >>>    999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99]
 -- >>> <$> [[7],[8],[9]]
 -- >>> :}
 -- [[999],[1000],[1001]]
-intCodeToList ::
+intcodeToList ::
   [Int] {- ^ initial memory -} ->
   [Int] {- ^ inputs         -} ->
   [Int] {- ^ outputs        -}
-intCodeToList = effectList . run . new
+intcodeToList = effectList . run . new
 
 -- | Evaluate a program's effect as a function from a list of
 -- inputs to a list of outputs.
@@ -281,35 +281,38 @@ data Step
 -- | Small-step semantics of virtual machine.
 step :: Machine -> Step
 step mach =
-  case populateParams <$> decode (at (pc mach)) of
+  case populateParams <$> decode (mach ! pc mach) of
     Nothing            -> StepFault
-    Just (pc', opcode) -> impl opcode $! jmp pc' mach
+    Just (pc', opcode) -> opcodeImpl opcode $! jmp pc' mach
 
   where
     populateParams :: Opcode Mode -> (Int, Opcode Int)
     populateParams = mapWithIndex toPtr (pc mach + 1)
 
-    at :: Int -> Int
-    at i = mach ! i
-
     toPtr :: Int -> Mode -> Int
-    toPtr i Imm =    i
-    toPtr i Abs = at i
-    toPtr i Rel = at i + relBase mach
+    toPtr i Imm =        i
+    toPtr i Abs = mach ! i
+    toPtr i Rel = mach ! i + relBase mach
 
-    impl :: Opcode Int -> Machine -> Step
-    impl opcode =
-      case opcode of
-        Add a b c -> Step . set c (at a + at b)
-        Mul a b c -> Step . set c (at a * at b)
-        Inp a     -> StepIn . flip (set a)
-        Out a     -> StepOut (at a)
-        Jnz a b   -> Step . if at a /= 0 then jmp (at b) else id
-        Jz  a b   -> Step . if at a == 0 then jmp (at b) else id
-        Lt  a b c -> Step . set c (if at a <  at b then 1 else 0)
-        Eq  a b c -> Step . set c (if at a == at b then 1 else 0)
-        Arb a     -> Step . adjustRelBase (at a)
-        Hlt       -> const StepHalt
+-- | Apply a decoded opcode to the machine state.
+opcodeImpl ::
+  Opcode Int {- ^ opcode with pointers    -} ->
+  Machine    {- ^ machine with PC updated -} ->
+  Step
+opcodeImpl o m =
+  case o of
+    Add a b c -> Step    (set c (at a + at b) m)
+    Mul a b c -> Step    (set c (at a * at b) m)
+    Inp a     -> StepIn  (\i -> set a i m)
+    Out a     -> StepOut (at a) m
+    Jnz a b   -> Step    (if at a /= 0 then jmp (at b) m else m)
+    Jz  a b   -> Step    (if at a == 0 then jmp (at b) m else m)
+    Lt  a b c -> Step    (set c (if at a <  at b then 1 else 0) m)
+    Eq  a b c -> Step    (set c (if at a == at b then 1 else 0) m)
+    Arb a     -> Step    (adjustRelBase (at a) m)
+    Hlt       -> StepHalt
+  where
+    at i = m ! i
 
 mapWithIndex :: (Int -> a -> b) -> Int -> Opcode a -> (Int, Opcode b)
 mapWithIndex f = mapAccumL (\i a -> (i+1, f i a))
@@ -401,7 +404,7 @@ digit i x = x `quot` (10^i) `rem` 10
 -- Exceptions
 ------------------------------------------------------------------------
 
--- | Error when a machine fails to step.
+-- | Error when a machine fails to decode an instruction.
 data IntcodeFault = IntcodeFault
   deriving (Eq, Ord, Show, Read)
 
