@@ -18,12 +18,12 @@ This implementation works with the following passes:
   1. Parse input text file into a list of numbers
   2. Execute op codes to single-step input/output effects.
   3. Execute single-stop effects into big-step effects.
-  4. Optional: Evaluate the effect as a function from a list of inputs to list of outputs
 
 Common use modes:
 
 * List functions: 'intcodeToList'
-* Effect interpretation: 'new', 'run', 'Effect'
+* Individual machine step processing: 'Step', 'new', 'step'
+* Input/output interpretation: 'Effect', 'new', 'run'
 
 -}
 module Intcode
@@ -60,7 +60,8 @@ import           Text.Show.Functions ()
 -- ASCII I/O
 ------------------------------------------------------------------------
 
--- | Run intcode program using stdio.
+-- | Run intcode program using stdio. Non-ASCII outputs are printed as
+-- integers.
 --
 -- >>> runIO (run (new [104,72,104,101,104,108,104,108,104,111,104,33,104,10,99]))
 -- Hello!
@@ -133,7 +134,10 @@ data Machine = Machine
   deriving (Eq, Ord, Show)
 
 -- | Value stored in initial memory image at given index.
-indexImage :: Machine -> Int -> Int
+indexImage ::
+  Machine {- ^ machine  -} ->
+  Int     {- ^ position -} ->
+  Int     {- ^ value    -}
 indexImage m i
   | a `seq` True, 0 <= i, i < P.sizeofPrimArray a = P.indexPrimArray a i
   | otherwise                                     = 0
@@ -207,7 +211,9 @@ data Effect
   | Fault                 -- ^ Execution failure
   deriving Show
 
--- | Big-step semantics of virtual machine.
+-- | Big-step semantics of virtual machine. The implementation details
+-- of 'Machine' are abstracted away and the program behavior can be
+-- observed by interpreting the various 'Effect' constructors.
 --
 -- >>> run (new [1102,34915192,34915192,7,4,7,99,0])
 -- Output 1219070632396864 Halt
@@ -252,7 +258,7 @@ followedBy Fault        _ = Fault
 followedBy (Output o x) y = Output o (followedBy x y)
 followedBy (Input  f  ) y = Input (\i -> followedBy (f i) y)
 
--- | Provide an input to the first occurence of an input request
+-- | Provide an input to the first occurrence of an input request
 -- in a program effect. It is considered a fault if a program
 -- terminates before using the input.
 --
@@ -365,7 +371,10 @@ decode n =
     fill = traverse (parameter n)
 
 -- | Compute the parameter mode for an argument at a given position.
-parameter :: Int {- ^ opcode -} -> Int {- ^ position -} -> Maybe Mode
+parameter ::
+  Int {- ^ opcode   -} ->
+  Int {- ^ position -} ->
+  Maybe Mode
 parameter n i =
   case digit (i+1) n of
     0 -> Just Abs
