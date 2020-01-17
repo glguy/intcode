@@ -1,5 +1,8 @@
 # Revision history for intcode
 
+## 0.3.0.0
+* Split machine-state and opcodes into separate modules.
+
 ## 0.2.0.0
 * Rename 'intCodeToList' to 'intcodeToList'
 

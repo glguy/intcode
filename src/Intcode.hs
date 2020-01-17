@@ -1,4 +1,4 @@
-{-# Language DeriveTraversable, Trustworthy #-}
+{-# Language DeriveTraversable, Safe #-}
 {-|
 Module      : Intcode
 Description : Intcode interpreter
@@ -33,7 +33,7 @@ module Intcode
   runIO,
 
   -- * Machine state
-  Machine(..), (!), new, set, memoryList,
+  Machine, (!), new, set, memoryList,
 
   -- * Effects
   Effect(..), run, (>>>), effectList, followedBy, feedInput,
@@ -41,20 +41,17 @@ module Intcode
   -- * Small-step
   Step(..), step,
 
-  -- * Opcodes
-  Mode(..), Opcode(..), decode,
-
   -- * Exceptions
   IntcodeFault(..)
   ) where
 
-import           Control.Exception (Exception(..), throwIO, throw)
-import           Data.Char         (chr, ord)
-import           Data.IntMap       (IntMap)
-import           Data.Traversable  (mapAccumL)
-import qualified Data.IntMap as IntMap
-import qualified Data.Primitive.PrimArray as P
-import           Text.Show.Functions ()
+import Control.Exception   (Exception(..), throw, throwIO)
+import Data.Char           (chr, ord)
+import Data.Traversable    (mapAccumL)
+import Text.Show.Functions ()
+
+import Intcode.Machine     (Machine(..), (!), addRelBase, jmp, memoryList, new, set)
+import Intcode.Opcode      (Mode(..), Opcode(..), decode)
 
 ------------------------------------------------------------------------
 -- ASCII I/O
@@ -119,85 +116,6 @@ effectList effect inputs =
     Output o e               -> o : effectList e inputs
     Halt                     -> []
     Fault                    -> throw IntcodeFault
-
-------------------------------------------------------------------------
--- Machine state
-------------------------------------------------------------------------
-
--- | Machine state.
-data Machine = Machine
-  { pc      :: !Int          -- ^ program counter
-  , relBase :: !Int          -- ^ relative base pointer
-  , memory  :: !(IntMap Int) -- ^ memory updates
-  , image   :: {-# Unpack #-} !(P.PrimArray Int) -- ^ initial memory
-  }
-  deriving (Eq, Ord, Show)
-
--- | Value stored in initial memory image at given index.
-indexImage ::
-  Machine {- ^ machine  -} ->
-  Int     {- ^ position -} ->
-  Int     {- ^ value    -}
-indexImage m i
-  | a `seq` True, 0 <= i, i < P.sizeofPrimArray a = P.indexPrimArray a i
-  | otherwise                                     = 0
-  where
-    a = image m
-{-# INLINE indexImage #-}
-
--- | Memory lookup from 0-based index.
-(!) ::
-  Machine {- ^ machine  -} ->
-  Int     {- ^ position -} ->
-  Int     {- ^ value    -}
-m ! i = IntMap.findWithDefault (indexImage m i) i (memory m)
-
--- | Construct machine from a list of initial values starting
--- at address 0. Program counter and relative base start at 0.
-new ::
-  [Int]   {- ^ initial memory -} ->
-  Machine {- ^ new machine    -}
-new initialValues = Machine
-  { pc      = 0
-  , relBase = 0
-  , memory  = IntMap.empty
-  , image   = P.primArrayFromList initialValues
-  }
-
--- | Update the value stored at a given location in memory.
-set ::
-  Int {- ^ position  -} ->
-  Int {- ^ new value -} ->
-  Machine -> Machine
-set i v m
-  | v == o    = m { memory = IntMap.delete i   (memory m) }
-  | otherwise = m { memory = IntMap.insert i v (memory m) }
-  where
-    o = indexImage m i
-
--- | Update the relative base pointer by adding an offset to it.
-adjustRelBase :: Int {- ^ offset -} -> Machine -> Machine
-adjustRelBase i mach = mach { relBase = relBase mach + i }
-
--- | Set program counter to a new address.
-jmp ::
-  Int {- ^ program counter -} ->
-  Machine -> Machine
-jmp i mach = mach { pc = i }
-
--- | Generate a list representation of memory starting from
--- zero. This can get big for sparsely filled memory using
--- large addresses. Returned values start at position 0.
---
--- >>> memoryList (set 8 10 (new [1,2,3]))
--- [1,2,3,0,0,0,0,0,10]
-memoryList :: Machine -> [Int]
-memoryList mach
-  | IntMap.null (memory mach) = P.primArrayToList (image mach)
-  | otherwise                 = [mach ! i | i <- [0 .. top]]
-  where
-    top = max (P.sizeofPrimArray (image mach) - 1)
-              (fst (IntMap.findMax (memory mach)))
 
 ------------------------------------------------------------------------
 -- Big-step semantics
@@ -315,7 +233,7 @@ opcodeImpl o m =
     Jz  a b   -> Step    (if at a == 0 then jmp (at b) m else m)
     Lt  a b c -> Step    (set c (if at a <  at b then 1 else 0) m)
     Eq  a b c -> Step    (set c (if at a == at b then 1 else 0) m)
-    Arb a     -> Step    (adjustRelBase (at a) m)
+    Arb a     -> Step    (addRelBase (at a) m)
     Hlt       -> StepHalt
   where
     at i = m ! i
@@ -323,91 +241,6 @@ opcodeImpl o m =
 mapWithIndex :: (Int -> a -> b) -> Int -> Opcode a -> (Int, Opcode b)
 mapWithIndex f = mapAccumL (\i a -> (i+1, f i a))
 {-# INLINE mapWithIndex #-}
-
-------------------------------------------------------------------------
--- Opcode decoder
-------------------------------------------------------------------------
-
--- | Parameter modes
-data Mode
-  = Abs -- ^ absolute position
-  | Imm -- ^ immediate
-  | Rel -- ^ relative position
-  deriving (Eq, Ord, Read, Show)
-
--- | Opcodes parameterized over argument representations.
-data Opcode a
-  = Add !a !a !a -- ^ addition:        @c = a + b@
-  | Mul !a !a !a -- ^ multiplication:  @c = a * b@
-  | Inp !a       -- ^ input:           @a = input()@
-  | Out !a       -- ^ output:          @output(a)@
-  | Jnz !a !a    -- ^ jump-if-true:    @if a then goto b@
-  | Jz  !a !a    -- ^ jump-if-false:   @if !a then goto b@
-  | Lt  !a !a !a -- ^ less-than:       @c = a < b@
-  | Eq  !a !a !a -- ^ equals:          @c = a == b@
-  | Arb !a       -- ^ adjust-rel-base: @rel += a@
-  | Hlt          -- ^ halt
-  deriving (Eq, Ord, Read, Show, Functor, Foldable)
-
--- | Decode an instruction to determine the opcode and parameter modes.
---
--- >>> decode 1002
--- Just (Mul Abs Imm Abs)
-decode :: Int {- ^ opcode -} -> Maybe (Opcode Mode)
-decode n =
-  case n `rem` 100 of
-    1  -> fill (Add 1 2 3)
-    2  -> fill (Mul 1 2 3)
-    3  -> fill (Inp 1)
-    4  -> fill (Out 1)
-    5  -> fill (Jnz 1 2)
-    6  -> fill (Jz  1 2)
-    7  -> fill (Lt  1 2 3)
-    8  -> fill (Eq  1 2 3)
-    9  -> fill (Arb 1)
-    99 -> fill Hlt
-    _  -> Nothing
-  where
-    fill = traverse (parameter n)
-
--- | Compute the parameter mode for an argument at a given position.
-parameter ::
-  Int {- ^ opcode   -} ->
-  Int {- ^ position -} ->
-  Maybe Mode
-parameter n i =
-  case digit (i+1) n of
-    0 -> Just Abs
-    1 -> Just Imm
-    2 -> Just Rel
-    _ -> Nothing
-
--- | Arguments visited from left to right.
-instance Traversable Opcode where
-  {-# INLINE traverse #-}
-  traverse f o =
-    case o of
-      Add x y z -> Add <$> f x <*> f y <*> f z
-      Mul x y z -> Mul <$> f x <*> f y <*> f z
-      Inp x     -> Inp <$> f x
-      Out x     -> Out <$> f x
-      Jnz x y   -> Jnz <$> f x <*> f y
-      Jz  x y   -> Jz  <$> f x <*> f y
-      Lt  x y z -> Lt  <$> f x <*> f y <*> f z
-      Eq  x y z -> Eq  <$> f x <*> f y <*> f z
-      Arb x     -> Arb <$> f x
-      Hlt       -> pure Hlt
-
--- | Extract the ith digit from a number.
---
--- >>> digit 0 2468
--- 8
--- >>> digit 3 2468
--- 2
--- >>> digit 4 2468
--- 0
-digit :: Int {- ^ position -} -> Int {- ^ number -} -> Int {- ^ digit -}
-digit i x = x `quot` (10^i) `rem` 10
 
 ------------------------------------------------------------------------
 -- Exceptions
