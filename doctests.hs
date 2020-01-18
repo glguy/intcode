@@ -1,3 +1,3 @@
 import Test.DocTest
 main :: IO ()
-main = doctest ["--verbose", "-isrc", "Intcode", "Intcode.Machine", "Intcode.Opcode", "Intcode.Parse"]
+main = doctest ["-isrc", "Intcode", "Intcode.Machine", "Intcode.Opcode", "Intcode.Parse"]

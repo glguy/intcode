@@ -28,29 +28,33 @@ Common use modes:
 -}
 module Intcode
   (
-  -- * Simple interface
+  -- * Simple list interface
   intcodeToList,
-  runIO,
 
   -- * Machine state
   Machine, (!), new, set, memoryList,
 
-  -- * Effects
+  -- * Big-step semantics
   Effect(..), run,
 
-  -- * Effect combinators
+  -- * Effect operations
   (>>>), followedBy, feedInput, effectList,
 
-  -- * Small-step
+  -- * Small-step semantics
   Step(..), step,
 
   -- * Exceptions
-  IntcodeFault(..)
+  IntcodeFault(..),
+
+  -- * ASCII I/O interface
+  runIO, hRunIO,
+
   ) where
 
 import Control.Exception   (Exception(..), throw, throwIO)
 import Data.Char           (chr, ord)
 import Data.Traversable    (mapAccumL)
+import System.IO           (Handle, hGetChar, hPutChar, hPutStrLn, stdin, stdout)
 import Text.Show.Functions ()
 
 import Intcode.Machine     (Machine(..), (!), addRelBase, jmp, memoryList, new, set)
@@ -63,15 +67,31 @@ import Intcode.Opcode      (Mode(..), Opcode(..), decode)
 -- | Run intcode program using stdio. Non-ASCII outputs are printed as
 -- integers.
 --
+-- Note that input and output is affected by handle buffering modes.
+--
 -- >>> runIO (run (new [104,72,104,101,104,108,104,108,104,111,104,33,104,10,99]))
 -- Hello!
+--
+-- >>> runIO (run (new [104,-50,104,1000,99]))
+-- <<-50>>
+-- <<1000>>
 runIO :: Effect -> IO ()
-runIO (Output o e)
-  | 0 <= o, o < 0x80  = putChar (chr (fromIntegral o))    >> runIO e
-  | otherwise         = putStrLn ("<<" ++ show o ++ ">>") >> runIO e
-runIO (Input f)       = runIO . f . fromIntegral . ord =<< getChar
-runIO Halt            = return ()
-runIO Fault           = throwIO IntcodeFault
+runIO = hRunIO stdin stdout
+
+-- | 'runIO' generalized to an arbitrary input and output handle.
+hRunIO ::
+  Handle {- ^ input handle  -} ->
+  Handle {- ^ output handle -} ->
+  Effect {- ^ effect        -} ->
+  IO ()
+hRunIO inH outH = go
+  where
+    go (Output o e)
+      | 0 <= o, o < 0x80 = hPutChar outH (chr (fromIntegral o)) >> go e
+      | otherwise        = hPutStrLn outH ("<<" ++ show o ++ ">>") >> go e
+    go (Input f)         = go . f . fromIntegral . ord =<< hGetChar inH
+    go Halt              = return ()
+    go Fault             = throwIO IntcodeFault
 
 ------------------------------------------------------------------------
 -- High-level interface
