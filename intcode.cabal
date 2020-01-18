@@ -38,8 +38,20 @@ library
     Intcode
     Intcode.Machine
     Intcode.Opcode
+    Intcode.Parse
 
   build-depends:
     base         >= 4.12 && < 4.14,
     containers   ^>= 0.6,
     primitive    ^>= 0.7,
+
+test-suite doctests
+  type:              exitcode-stdio-1.0
+  main-is:           doctests.hs
+  default-language:  Haskell2010
+  ghc-options:       -threaded
+  build-depends:
+    base,
+    containers,
+    primitive,
+    doctest ^>= 0.16,
