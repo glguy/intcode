@@ -12,17 +12,31 @@ used in the Advent of Code input files.
 -}
 module Intcode.Parse (parseInts) where
 
-import Text.ParserCombinators.ReadP
-
 -- | Parse a list of comma separated integers.
 --
--- >>> parseInts "1,-2,3"
--- Just [1,-2,3]
-parseInts :: String -> Maybe [Int]
-parseInts str =
-  case readP_to_S (parseIntsP <* eof) str of
-    [(xs, rest)] | [("","")] <- lex rest -> Just xs
-    _                                    -> Nothing
+-- >>> parseInts "1, - 2, 3,-4"
+-- Just [1,-2,3,-4]
+--
+-- >>> parseInts " "
+-- Just []
+--
+-- >>> parseInts "1,2,3,x"
+-- Nothing
+parseInts ::
+  String      {- ^ parser input    -} ->
+  Maybe [Int] {- ^ parsed integers -}
+parseInts str
+  | [(i,str1)] <- reads str = parseInts' [i] str1
+  | [("","")]  <- lex str   = Just []
+  | otherwise               = Nothing
 
-parseIntsP :: ReadP [Int]
-parseIntsP = readS_to_P reads `sepBy` char ','
+-- | Helper function for 'parseInts'
+parseInts' ::
+  [Int]       {- ^ reversed accumulator -} ->
+  String      {- ^ parser input         -} ->
+  Maybe [Int] {- ^ parsed integers      -}
+parseInts' xs str =
+  case lex str of
+    [(",",str1)] | [(x,str2)] <- reads str1 -> parseInts' (x:xs) str2
+    [("","")]                               -> Just (reverse xs)
+    _                                       -> Nothing
