@@ -36,7 +36,10 @@ module Intcode
   Machine, (!), new, set, memoryList,
 
   -- * Effects
-  Effect(..), run, (>>>), effectList, followedBy, feedInput,
+  Effect(..), run,
+
+  -- * Effect combinators
+  (>>>), followedBy, feedInput, effectList,
 
   -- * Small-step
   Step(..), step,
@@ -170,6 +173,12 @@ infixl 9 >>>
 --
 -- >>> Output 1 Halt `followedBy` Output 2 Halt
 -- Output 1 (Output 2 Halt)
+--
+-- >>> Output 1 Halt `followedBy` Fault
+-- Output 1 Fault
+--
+-- >>> Fault `followedBy` undefined
+-- Fault
 followedBy :: Effect -> Effect -> Effect
 followedBy Halt         y = y
 followedBy Fault        _ = Fault
@@ -180,9 +189,11 @@ followedBy (Input  f  ) y = Input (\i -> followedBy (f i) y)
 -- in a program effect. It is considered a fault if a program
 -- terminates before using the input.
 --
--- >>> let mult n = Input (\i -> Output (i*n) Halt)
--- >>> feedInput [6] (mult 5)
+-- >>> feedInput [5,6] (Input (\x -> Input (\y -> Output (x*y) Halt)))
 -- Output 30 Halt
+--
+-- >>> feedInput [7] Halt
+-- Fault
 feedInput :: [Int] {- ^ inputs -} -> Effect -> Effect
 feedInput []     e            = e
 feedInput xs     (Output o e) = Output o (feedInput xs e)

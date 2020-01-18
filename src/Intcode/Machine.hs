@@ -36,7 +36,18 @@ import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.Primitive.PrimArray as P
 
--- | Machine state.
+-- | Machine state is comprised of the program counter, relative base
+-- pointer, and memory.
+--
+-- * Interact with registers using: 'jmp', 'addRelBase'
+-- * Interact with memory using: ('!'), 'set'
+-- * Build new machines with: 'new'
+--
+-- Updates to memory are stored separately from the initial values
+-- which can enable equality comparisons to be relatively efficient.
+-- This efficiency comes from being able to compare the inital memory
+-- using only pointer equality when two machines are created by the
+-- same call to 'new'.
 data Machine = Machine
   { pc         :: !Int          -- ^ program counter
   , relBase    :: !Int          -- ^ relative base pointer
