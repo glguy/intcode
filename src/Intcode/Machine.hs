@@ -62,8 +62,8 @@ indexImage ::
   Int     {- ^ position -} ->
   Int     {- ^ value    -}
 indexImage m i
-  | a `seq` True, 0 <= i, i < P.sizeofPrimArray a = P.indexPrimArray a i
-  | otherwise                                     = 0
+  | i < P.sizeofPrimArray a, 0 <= i = P.indexPrimArray a i
+  | otherwise                       = 0
   where
     a = memInitial m
 {-# INLINE indexImage #-}
@@ -119,7 +119,9 @@ jmp i mach = mach { pc = i }
 --
 -- >>> memoryList (set 8 10 (new [1,2,3]))
 -- [1,2,3,0,0,0,0,0,10]
-memoryList :: Machine -> [Int]
+memoryList ::
+  Machine ->
+  [Int] {- ^ memory values -}
 memoryList mach
   | IntMap.null (memUpdates mach) = P.primArrayToList (memInitial mach)
   | otherwise                  = [mach ! i | i <- [0 .. top]]

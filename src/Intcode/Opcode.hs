@@ -35,16 +35,16 @@ data Mode
 
 -- | Opcodes parameterized over argument representations.
 data Opcode a
-  = Add !a !a !a -- ^ addition:        @c = a + b@
-  | Mul !a !a !a -- ^ multiplication:  @c = a * b@
-  | Inp !a       -- ^ input:           @a = input()@
-  | Out !a       -- ^ output:          @output(a)@
-  | Jnz !a !a    -- ^ jump-if-true:    @if a then goto b@
-  | Jz  !a !a    -- ^ jump-if-false:   @if !a then goto b@
-  | Lt  !a !a !a -- ^ less-than:       @c = a < b@
-  | Eq  !a !a !a -- ^ equals:          @c = a == b@
-  | Arb !a       -- ^ adjust-rel-base: @rel += a@
-  | Hlt          -- ^ halt
+  = Add !a !a !a -- ^ __addition:__        @c = a + b@
+  | Mul !a !a !a -- ^ __multiplication:__  @c = a * b@
+  | Inp !a       -- ^ __input:__           @a = input()@
+  | Out !a       -- ^ __output:__          @output(a)@
+  | Jnz !a !a    -- ^ __jump-if-true:__    @if a then goto b@
+  | Jz  !a !a    -- ^ __jump-if-false:__   @if !a then goto b@
+  | Lt  !a !a !a -- ^ __less-than:__       @c = a < b@
+  | Eq  !a !a !a -- ^ __equals:__          @c = a == b@
+  | Arb !a       -- ^ __adjust-rel-base:__ @rel += a@
+  | Hlt          -- ^ __halt__
   deriving (Eq, Ord, Read, Show, Functor, Foldable)
 
 -- | Decode an instruction to determine the opcode and parameter modes.
@@ -56,13 +56,13 @@ decode n =
   case n `rem` 100 of
     1  -> fill (Add 1 2 3)
     2  -> fill (Mul 1 2 3)
-    3  -> fill (Inp 1)
-    4  -> fill (Out 1)
-    5  -> fill (Jnz 1 2)
-    6  -> fill (Jz  1 2)
+    3  -> fill (Inp 1    )
+    4  -> fill (Out 1    )
+    5  -> fill (Jnz 1 2  )
+    6  -> fill (Jz  1 2  )
     7  -> fill (Lt  1 2 3)
     8  -> fill (Eq  1 2 3)
-    9  -> fill (Arb 1)
+    9  -> fill (Arb 1    )
     99 -> fill Hlt
     _  -> Nothing
   where

@@ -13,17 +13,18 @@ This Intcode interpreter is defined across multiple Advent of Code days:
 * <https://adventofcode.com/2019/day/7>
 * <https://adventofcode.com/2019/day/9>
 
-This implementation works with the following passes:
-
-  1. Parse input text file into a list of numbers
-  2. Execute op codes to single-step input/output effects.
-  3. Execute single-stop effects into big-step effects.
-
 Common use modes:
 
-* List functions: 'intcodeToList'
-* Individual machine step processing: 'Step', 'new', 'step'
-* Input/output interpretation: 'Effect', 'new', 'run'
+* Machine construction: 'new'
+* List functions: 'intcodeToList', 'effectList'
+* Individual machine step processing: 'Step', 'step'
+* Input/output interpretation: 'Effect', 'run'
+
+Submodules:
+
+* "Intcode.Machine" exposes the implementation details of the interpreter state.
+* "Intcode.Parse" provides a parser for intcode text files.
+* "Intcode.Opcode" provides types and the decoder for opcodes.
 
 -}
 module Intcode
@@ -134,11 +135,13 @@ effectList ::
   [Int]  {- ^ outputs        -}
 effectList effect inputs =
   case effect of
-    Input f | x:xs <- inputs -> effectList (f x) xs
-            | otherwise      -> throw IntcodeFault
-    Output o e               -> o : effectList e inputs
-    Halt                     -> []
-    Fault                    -> throw IntcodeFault
+    Fault      -> throw IntcodeFault
+    Halt       -> []
+    Output o e -> o : effectList e inputs
+    Input f    ->
+      case inputs of
+        x:xs -> effectList (f x) xs
+        []   -> throw IntcodeFault
 
 ------------------------------------------------------------------------
 -- Big-step semantics
@@ -179,13 +182,15 @@ run mach =
 -- >>> effectList (mult 3 >>> add 1) [4]
 -- [13]
 (>>>) :: Effect -> Effect -> Effect
-x          >>> Output o y = Output o (x >>> y)
-_          >>> Halt       = Halt
-_          >>> Fault      = Fault
-Output o x >>> Input f    = x >>> f o
-Halt       >>> Input _    = Fault
-Fault      >>> Input _    = Fault
-Input f    >>> y          = Input (\i -> f i >>> y)
+_ >>> Fault      = Fault
+_ >>> Halt       = Halt
+x >>> Output o e = Output o (x >>> e)
+x >>> Input g    = input x
+  where
+    input Fault        = Fault
+    input Halt         = Fault
+    input (Output o e) = e >>> g o
+    input (Input f)    = Input (input . f)
 
 infixl 9 >>>
 
@@ -203,7 +208,7 @@ followedBy :: Effect -> Effect -> Effect
 followedBy Halt         y = y
 followedBy Fault        _ = Fault
 followedBy (Output o x) y = Output o (followedBy x y)
-followedBy (Input  f  ) y = Input (\i -> followedBy (f i) y)
+followedBy (Input f)    y = Input (\i -> followedBy (f i) y)
 
 -- | Provide an input to the first occurrence of an input request
 -- in a program effect. It is considered a fault if a program
@@ -218,7 +223,7 @@ feedInput :: [Int] {- ^ inputs -} -> Effect -> Effect
 feedInput []     e            = e
 feedInput xs     (Output o e) = Output o (feedInput xs e)
 feedInput (x:xs) (Input f)    = feedInput xs (f x)
-feedInput _ _                 = Fault
+feedInput _      _            = Fault
 
 ------------------------------------------------------------------------
 -- Small-step semantics
