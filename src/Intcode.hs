@@ -1,4 +1,4 @@
-{-# Language DeriveTraversable, Safe #-}
+{-# Language Safe #-}
 {-|
 Module      : Intcode
 Description : Intcode interpreter
@@ -6,12 +6,21 @@ Copyright   : (c) Eric Mertens, 2019
 License     : ISC
 Maintainer  : emertens@gmail.com
 
-This Intcode interpreter is defined across multiple Advent of Code days:
+Intcode is a virtual machine environment defined to have some arithmetic,
+conditional jumps, and simple input and output facilities.
 
-* <https://adventofcode.com/2019/day/2>
-* <https://adventofcode.com/2019/day/5>
-* <https://adventofcode.com/2019/day/7>
-* <https://adventofcode.com/2019/day/9>
+The instruction set is designed with independently selectable address modes for
+each of its input and output parameters. The architecture is designed to be
+simple to implement while powerful enough to write interesting programs
+efficiently. The addition of a /relative base pointer/ makes it easy to
+implement function calls in the language.
+
+This Intcode architecture is defined across multiple
+<https://adventofcode.com/2019/about Advent of Code 2019> tasks:
+<https://adventofcode.com/2019/day/2 2>,
+<https://adventofcode.com/2019/day/5 5>,
+<https://adventofcode.com/2019/day/7 7>, and
+<https://adventofcode.com/2019/day/9 9>
 
 Common use modes:
 
