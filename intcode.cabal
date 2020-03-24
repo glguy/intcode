@@ -41,7 +41,7 @@ library
     Intcode.Parse
 
   build-depends:
-    base         >= 4.12 && < 4.14,
+    base         ^>= 4.12 || ^>= 4.13 || ^>=4.14,
     containers   ^>= 0.6,
     primitive    ^>= 0.7,
 
