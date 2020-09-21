@@ -54,4 +54,4 @@ test-suite doctests
     base,
     containers,
     primitive,
-    doctest ^>= 0.16,
+    doctest ^>= 0.17,
