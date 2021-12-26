@@ -48,7 +48,7 @@ module Intcode
   Effect(..), run,
 
   -- * Effect operations
-  (>>>), followedBy, feedInput, effectList,
+  effectList,
 
   -- * Small-step semantics
   Step(..), step,
@@ -63,12 +63,10 @@ module Intcode
 
 import Control.Exception   (Exception(..), throw, throwIO)
 import Data.Char           (chr, ord)
-import Data.Traversable    (mapAccumL)
 import System.IO           (Handle, hGetChar, hPutChar, hPutStrLn, stdin, stdout)
-import Text.Show.Functions ()
 
-import Intcode.Machine     (Machine(..), (!), addRelBase, jmp, memoryList, new, set)
-import Intcode.Opcode      (Mode(..), Opcode(..), decode)
+import Intcode.Machine     (Machine(..), (!), memoryList, new, set)
+import Intcode.Step        (Step(..), step)
 
 ------------------------------------------------------------------------
 -- ASCII I/O
@@ -181,111 +179,6 @@ run mach =
     StepIn f          -> Input (run . f)
     StepHalt          -> Halt
     StepFault         -> Fault
-
--- | Compose two effects together. Outputs from first argument are
--- used as inputs to the second effect. Composed effect halts when
--- the second machine halts.
---
--- >>> let mult n = Input (\i -> Output (i*n) Halt)
--- >>> let add  n = Input (\i -> Output (i+n) Halt)
--- >>> effectList (mult 3 >>> add 1) [4]
--- [13]
-(>>>) :: Effect -> Effect -> Effect
-_ >>> Fault      = Fault
-_ >>> Halt       = Halt
-x >>> Output o e = Output o (x >>> e)
-x >>> Input g    = input x
-  where
-    input Fault        = Fault
-    input Halt         = Fault
-    input (Output o e) = e >>> g o
-    input (Input f)    = Input (input . f)
-
-infixl 9 >>>
-
--- | Run first effect until it halts, then run the second effect.
---
--- >>> Output 1 Halt `followedBy` Output 2 Halt
--- Output 1 (Output 2 Halt)
---
--- >>> Output 1 Halt `followedBy` Fault
--- Output 1 Fault
---
--- >>> Fault `followedBy` undefined
--- Fault
-followedBy :: Effect -> Effect -> Effect
-followedBy Halt         y = y
-followedBy Fault        _ = Fault
-followedBy (Output o x) y = Output o (followedBy x y)
-followedBy (Input f)    y = Input (\i -> followedBy (f i) y)
-
--- | Provide an input to the first occurrence of an input request
--- in a program effect. It is considered a fault if a program
--- terminates before using the input.
---
--- >>> feedInput [5,6] (Input (\x -> Input (\y -> Output (x*y) Halt)))
--- Output 30 Halt
---
--- >>> feedInput [7] Halt
--- Fault
-feedInput :: [Int] {- ^ inputs -} -> Effect -> Effect
-feedInput []     e            = e
-feedInput xs     (Output o e) = Output o (feedInput xs e)
-feedInput (x:xs) (Input f)    = feedInput xs (f x)
-feedInput _      _            = Fault
-
-------------------------------------------------------------------------
--- Small-step semantics
-------------------------------------------------------------------------
-
--- | Result of small-step semantics.
-data Step
-  = Step    !Machine         -- ^ no effect
-  | StepOut !Int !Machine    -- ^ output
-  | StepIn  (Int -> Machine) -- ^ input
-  | StepHalt                 -- ^ halt
-  | StepFault                -- ^ bad instruction
-  deriving Show
-
--- | Small-step semantics of virtual machine.
-step :: Machine -> Step
-step mach =
-  case populateParams <$> decode (mach ! pc mach) of
-    Nothing            -> StepFault
-    Just (pc', opcode) -> opcodeImpl opcode $! jmp pc' mach
-
-  where
-    populateParams :: Opcode Mode -> (Int, Opcode Int)
-    populateParams = mapWithIndex toPtr (pc mach + 1)
-
-    toPtr :: Int -> Mode -> Int
-    toPtr i Imm =        i
-    toPtr i Abs = mach ! i
-    toPtr i Rel = mach ! i + relBase mach
-
--- | Apply a decoded opcode to the machine state.
-opcodeImpl ::
-  Opcode Int {- ^ opcode with pointers    -} ->
-  Machine    {- ^ machine with PC updated -} ->
-  Step
-opcodeImpl o m =
-  case o of
-    Add a b c -> Step    (set c (at a + at b) m)
-    Mul a b c -> Step    (set c (at a * at b) m)
-    Inp a     -> StepIn  (\i -> set a i m)
-    Out a     -> StepOut (at a) m
-    Jnz a b   -> Step    (if at a /= 0 then jmp (at b) m else m)
-    Jz  a b   -> Step    (if at a == 0 then jmp (at b) m else m)
-    Lt  a b c -> Step    (set c (if at a <  at b then 1 else 0) m)
-    Eq  a b c -> Step    (set c (if at a == at b then 1 else 0) m)
-    Arb a     -> Step    (addRelBase (at a) m)
-    Hlt       -> StepHalt
-  where
-    at i = m ! i
-
-mapWithIndex :: (Int -> a -> b) -> Int -> Opcode a -> (Int, Opcode b)
-mapWithIndex f = mapAccumL (\i a -> (i+1, f i a))
-{-# INLINE mapWithIndex #-}
 
 ------------------------------------------------------------------------
 -- Exceptions

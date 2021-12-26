@@ -1,5 +1,8 @@
 # Revision history for intcode
 
+## 0.4.0.0
+* Add `Intcode.Step`
+
 ## 0.3.0.0
 * Split machine-state and opcodes into separate modules.
 * Add `Intcode.Parse`

@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                intcode
-version:             0.3.0.0
+version:             0.4.0.0
 synopsis:            Advent of Code 2019 intcode interpreter
 category:            Compilers/Interpreters
 license:             ISC
@@ -39,6 +39,7 @@ library
     Intcode.Machine
     Intcode.Opcode
     Intcode.Parse
+    Intcode.Step
 
   build-depends:
     base         >= 4.12 && < 4.17,
