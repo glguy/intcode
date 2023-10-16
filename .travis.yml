@@ -13,7 +13,7 @@
 version: ~> 1.0
 language: c
 os: linux
-dist: bionic
+dist: jammy
 git:
   # whether to recursively clone submodules
   submodules: false
@@ -34,13 +34,10 @@ before_cache:
 jobs:
   include:
     - compiler: ghc-9.6.3
-      addons: {"apt":{"packages":["ghc-9.6.3","cabal-install-3.10"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
+      addons: {"apt":{"packages":["ghc-9.6.3","cabal-install-3.10"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu jammy main"}]}}
       os: linux
     - compiler: ghc-9.4.7
-      addons: {"apt":{"packages":["ghc-9.4.7","cabal-install-3.10"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
-      os: linux
-    - compiler: ghc-9.2.8
-      addons: {"apt":{"packages":["ghc-9.2.8","cabal-install-3.10"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
+      addons: {"apt":{"packages":["ghc-9.4.7","cabal-install-3.10"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu jammy main"}]}}
       os: linux
 before_install:
   - HC=$(echo "/opt/$CC/bin/ghc" | sed 's/-/\//')
