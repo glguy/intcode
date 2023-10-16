@@ -12,7 +12,7 @@ copyright:           2019 Eric Mertens
 build-type:          Simple
 homepage:            https://github.com/glguy/intcode
 bug-reports:         https://github.com/glguy/intcode/issues
-tested-with:         GHC ==9.2.8, GHC ==9.4.7, GHC ==9.6.3
+tested-with:         GHC ==9.4.7, GHC ==9.6.3
 
 description:
   Implementation of the Intcode virtual machine as defined by
