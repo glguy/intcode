@@ -22,7 +22,7 @@ description:
   of the interpreter and exposes multiple levels of abstraction
   to make it easy to use in a variety of situations.
 
-extra-source-files:
+extra-doc-files:
   CHANGELOG.md
   README.md
 
