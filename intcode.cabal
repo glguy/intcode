@@ -1,4 +1,4 @@
-cabal-version:       2.4
+cabal-version:       3.0
 
 name:                intcode
 version:             0.4.0.0
@@ -12,7 +12,7 @@ copyright:           2019 Eric Mertens
 build-type:          Simple
 homepage:            https://github.com/glguy/intcode
 bug-reports:         https://github.com/glguy/intcode/issues
-tested-with:         GHC ==9.2.5, GHC ==9.4.4
+tested-with:         GHC ==9.2.8, GHC ==9.4.7, GHC ==9.6.3
 
 description:
   Implementation of the Intcode virtual machine as defined by
@@ -42,9 +42,9 @@ library
     Intcode.Step
 
   build-depends:
-    base         >= 4.12 && < 4.19,
-    containers   ^>= 0.6,
-    primitive    ^>= 0.8,
+    base         >= 4.12 && < 4.20,
+    containers   ^>= {0.6, 0.7},
+    primitive    ^>= {0.8, 0.9},
 
 test-suite doctests
   type:              exitcode-stdio-1.0
@@ -55,4 +55,4 @@ test-suite doctests
     base,
     containers,
     primitive,
-    doctest ^>= 0.21,
+    doctest ^>= 0.22,
