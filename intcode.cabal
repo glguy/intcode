@@ -43,7 +43,7 @@ library
 
   build-depends:
     base         >= 4.12 && < 4.22,
-    containers   ^>= {0.6, 0.7},
+    containers   ^>= {0.6, 0.7, 0.8},
     primitive    ^>= {0.8, 0.9},
 
 test-suite doctests
@@ -55,4 +55,4 @@ test-suite doctests
     base >= 4.12 && < 4.22,
     containers,
     primitive,
-    doctest ^>= 0.23,
+    doctest ^>= 0.24,
